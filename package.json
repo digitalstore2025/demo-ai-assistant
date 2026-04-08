@@ -1,0 +1,7 @@
+{
+  "name": "goose-recipe",
+  "version": "1.0.0",
+  "scripts": {
+    "fix:tests": "bash scripts/run-recipe.sh"
+  }
+}
