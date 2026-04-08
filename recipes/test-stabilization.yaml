@@ -1,0 +1,101 @@
+name: test-stabilization
+description: Self-healing pipeline for failing tests
+
+env:
+  runtime: node
+  version: 18
+
+vars:
+  TEST_CMD: "npm test"
+  TARGET_DIRS:
+    - src/auth
+    - src/api
+
+limits:
+  MAX_FILES_CHANGED: 20
+
+steps:
+
+  - id: setup_branch
+    run: |
+      git checkout -b fix/test-stabilization || git checkout fix/test-stabilization
+
+  - id: run_tests
+    run: |
+      {{TEST_CMD}} || true
+
+  - id: collect_failures
+    prompt: |
+      Parse the latest test output.
+      Extract failing tests with:
+      - file
+      - test name
+      - error message
+
+      Return JSON.
+
+  - id: diagnose
+    prompt: |
+      Given failing tests:
+      {{collect_failures.output}}
+
+      Classify each:
+      - logic bug
+      - test issue
+      - config/dependency
+
+      Provide root cause.
+
+  - id: propose_fix
+    prompt: |
+      Based on diagnosis:
+      {{diagnose.output}}
+
+      Propose minimal fixes.
+      Do NOT implement.
+
+      Estimate:
+      - files_to_change
+      - risk_level (low/medium/high)
+
+  - id: guardrail
+    condition: "{{propose_fix.output.files_to_change}} > {{limits.MAX_FILES_CHANGED}}"
+    on_true:
+      run: |
+        echo "ABORT: too many files affected"
+        exit 1
+    on_false:
+      next: implement
+
+  - id: implement
+    prompt: |
+      Apply fixes from:
+      {{propose_fix.output}}
+
+      Rules:
+      - do NOT skip tests
+      - do NOT delete tests
+      - preserve API contracts
+
+  - id: validate
+    run: |
+      {{TEST_CMD}}
+
+  - id: lint_build
+    run: |
+      npm run lint || true
+      npm run build || true
+
+  - id: commit
+    run: |
+      git add .
+      git commit -m "fix: stabilize failing tests" || true
+
+  - id: report
+    prompt: |
+      Generate final report:
+      - failures
+      - root causes
+      - fixes
+      - risks
+      - final status
