@@ -6,6 +6,7 @@ from pydantic import BaseModel, EmailStr
 class UserCreate(BaseModel):
     email: Optional[EmailStr] = None
     phone: Optional[str] = None
+    password: Optional[str] = None
     role: str = "patient"
     language: str = "ar"
 
@@ -13,6 +14,7 @@ class UserCreate(BaseModel):
 class UserLogin(BaseModel):
     email: Optional[str] = None
     phone: Optional[str] = None
+    password: str
 
 
 class UserResponse(BaseModel):

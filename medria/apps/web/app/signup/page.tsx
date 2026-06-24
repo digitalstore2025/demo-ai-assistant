@@ -6,6 +6,7 @@ import { useState } from 'react';
 export default function SignupPage() {
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
+  const [password, setPassword] = useState('');
   const [message, setMessage] = useState('');
 
   async function handleSubmit(e: React.FormEvent) {
@@ -13,10 +14,13 @@ export default function SignupPage() {
     const res = await fetch('http://localhost:8000/auth/signup', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, phone, role: 'patient', language: 'ar' }),
+      body: JSON.stringify({ email, phone, password, role: 'patient', language: 'ar' }),
     });
     const data = await res.json();
-    setMessage(res.ok ? 'Account created' : data.detail || 'Failed');
+    if (res.ok && data.access_token) {
+      localStorage.setItem('medria_token', data.access_token);
+    }
+    setMessage(res.ok ? 'Account created and signed in' : data.detail || 'Failed');
   }
 
   return (
@@ -25,6 +29,7 @@ export default function SignupPage() {
       <form onSubmit={handleSubmit} style={{ display: 'grid', gap: 12 }}>
         <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email" />
         <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="Phone" />
+        <input value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Password" type="password" />
         <button type="submit">Create</button>
       </form>
       <p>{message}</p>

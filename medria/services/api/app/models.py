@@ -11,6 +11,7 @@ class User(Base):
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     email = Column(String, unique=True, nullable=True)
     phone = Column(String, unique=True, nullable=True)
+    password_hash = Column(String, nullable=True)
     role = Column(String, default="patient")
     language = Column(String, default="ar")
     created_at = Column(DateTime, default=datetime.utcnow)

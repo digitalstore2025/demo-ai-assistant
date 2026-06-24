@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from .ai_safety import evaluate_safety
-from .auth import authenticate_user, create_user_record
+from .auth import authenticate_user, create_access_token, create_user_record, get_current_user
 from .database import get_db
 from .models import Appointment, ChatSession, DoctorProfile, Message, User
 from .schemas import (
@@ -33,25 +33,21 @@ def root() -> dict[str, str]:
     return {"message": "Medria AI API is up"}
 
 
-@router.post("/auth/signup", response_model=UserResponse)
+@router.post("/auth/signup")
 def signup(payload: UserCreate, db: Session = Depends(get_db)):
+    if not payload.password:
+        raise HTTPException(status_code=400, detail="Password is required")
     user = create_user_record(
         db=db,
         email=str(payload.email) if payload.email else None,
         phone=payload.phone,
         role=payload.role,
         language=payload.language,
+        password=payload.password,
     )
-    return user
-
-
-@router.post("/auth/login")
-def login(payload: UserLogin, db: Session = Depends(get_db)):
-    if not payload.email and not payload.phone:
-        raise HTTPException(status_code=400, detail="Provide email or phone")
-    user = authenticate_user(db=db, email=payload.email, phone=payload.phone)
+    token = create_access_token(user.id)
     return {
-        "access_token": f"demo-token-{user.id}",
+        "access_token": token,
         "token_type": "bearer",
         "user": {
             "id": user.id,
@@ -60,6 +56,29 @@ def login(payload: UserLogin, db: Session = Depends(get_db)):
             "language": user.language,
         },
     }
+
+
+@router.post("/auth/login")
+def login(payload: UserLogin, db: Session = Depends(get_db)):
+    if not payload.email and not payload.phone:
+        raise HTTPException(status_code=400, detail="Provide email or phone")
+    user = authenticate_user(db=db, email=payload.email, phone=payload.phone, password=payload.password)
+    token = create_access_token(user.id)
+    return {
+        "access_token": token,
+        "token_type": "bearer",
+        "user": {
+            "id": user.id,
+            "email": user.email,
+            "role": user.role,
+            "language": user.language,
+        },
+    }
+
+
+@router.get("/users/me", response_model=UserResponse)
+def get_me(current_user: User = Depends(get_current_user)):
+    return current_user
 
 
 @router.get("/users/{user_id}", response_model=UserResponse)
@@ -89,9 +108,9 @@ def create_doctor_profile(payload: DoctorProfileCreate, db: Session = Depends(ge
 
 
 @router.post("/appointments", response_model=AppointmentResponse)
-def create_appointment(payload: AppointmentCreate, db: Session = Depends(get_db)):
+def create_appointment(payload: AppointmentCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     appointment = Appointment(
-        patient_id=payload.patient_id,
+        patient_id=current_user.id,
         doctor_id=payload.doctor_id,
         start_time=payload.start_time,
         end_time=payload.end_time,
