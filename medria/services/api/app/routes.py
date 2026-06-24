@@ -5,6 +5,7 @@ from .ai_safety import evaluate_safety
 from .auth import authenticate_user, create_access_token, create_user_record, get_current_user
 from .database import get_db
 from .models import Appointment, ChatSession, DoctorProfile, Message, User
+from .rag import build_context, retrieve_documents
 from .schemas import (
     AiSummaryRequest,
     AppointmentCreate,
@@ -154,8 +155,29 @@ def list_messages(session_id: str, db: Session = Depends(get_db)):
 @router.post("/ai/summarize")
 def ai_summarize(payload: AiSummaryRequest):
     safety = evaluate_safety(payload.summary)
+    context = build_context(payload.summary)
     return {
         "summary": payload.summary,
         "safety_flags": safety["flags"],
         "needs_human_review": safety["needs_human_review"],
+        "context": context,
+    }
+
+
+@router.post("/ai/rag-query")
+def rag_query(payload: AiSummaryRequest):
+    docs = retrieve_documents(payload.summary, top_k=3)
+    return {
+        "query": payload.summary,
+        "documents": [{"title": doc.title, "content": doc.content, "authority": doc.authority} for doc in docs],
+    }
+
+
+@router.get("/admin/dashboard")
+def admin_dashboard(db: Session = Depends(get_db)):
+    return {
+        "users_count": db.query(User).count(),
+        "appointments_count": db.query(Appointment).count(),
+        "messages_count": db.query(Message).count(),
+        "pending_doctors_count": db.query(DoctorProfile).filter(DoctorProfile.license_status == "pending").count(),
     }

@@ -1,8 +1,10 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy.orm import Session
 
-from .database import Base, engine
+from .database import Base, SessionLocal, engine
 from .routes import router
+from .seed import ensure_seed_data
 
 Base.metadata.create_all(bind=engine)
 
@@ -17,3 +19,12 @@ app.add_middleware(
 )
 
 app.include_router(router)
+
+
+@app.on_event("startup")
+def startup_event() -> None:
+    db: Session = SessionLocal()
+    try:
+        ensure_seed_data(db)
+    finally:
+        db.close()
